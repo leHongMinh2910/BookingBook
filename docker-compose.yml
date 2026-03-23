@@ -1,0 +1,133 @@
+services:
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      IDENTITY_SERVICE_URL: ${IDENTITY_SERVICE_URL:-http://identity-service:8000}
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8000}
+      ORDER_SERVICE_URL: http://order-service:8000
+    depends_on:
+      - identity-service
+      - catalog-service
+      - order-service
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "sleep 30 &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000"
+
+  identity-db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: identity_db
+      MYSQL_USER: ${MYSQL_USER:-bookstore}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookstore}
+    ports:
+      - "3307:3306"
+    volumes:
+      - identity_mysql_data:/var/lib/mysql
+
+  catalog-db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: catalog_db
+      MYSQL_USER: ${MYSQL_USER:-bookstore}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookstore}
+    ports:
+      - "3308:3306"
+    volumes:
+      - catalog_mysql_data:/var/lib/mysql
+
+  order-db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: order_db
+      MYSQL_USER: ${MYSQL_USER:-bookstore}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookstore}
+    ports:
+      - "3309:3306"
+    volumes:
+      - order_mysql_data:/var/lib/mysql
+
+  identity-service:
+    build:
+      context: ./services/identity-service
+    environment:
+      MYSQL_DB: identity_db
+      MYSQL_HOST: identity-db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-bookstore}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookstore}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+    depends_on:
+      - identity-db
+    ports:
+      - "8001:8000"
+    command: >
+      sh -c "sleep 15 &&
+      python manage.py makemigrations accounts &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000"
+
+  catalog-service:
+    build:
+      context: ./services/catalog-service
+    environment:
+      MYSQL_DB: catalog_db
+      MYSQL_HOST: catalog-db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-bookstore}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookstore}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      IDENTITY_SERVICE_URL: ${IDENTITY_SERVICE_URL:-http://identity-service:8000}
+    depends_on:
+      - catalog-db
+      - identity-service
+    ports:
+      - "8002:8000"
+    command: >
+      sh -c "sleep 20 &&
+      python manage.py makemigrations catalog &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000"
+
+  order-service:
+    build:
+      context: ./services/order-service
+    environment:
+      MYSQL_DB: order_db
+      MYSQL_HOST: order-db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-bookstore}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bookstore}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      IDENTITY_SERVICE_URL: ${IDENTITY_SERVICE_URL:-http://identity-service:8000}
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8000}
+    depends_on:
+      - order-db
+      - identity-service
+      - catalog-service
+    ports:
+      - "8003:8000"
+    command: >
+      sh -c "sleep 25 &&
+      python manage.py makemigrations orders &&
+      python manage.py migrate &&
+      python manage.py runserver 0.0.0.0:8000"
+
+volumes:
+  identity_mysql_data:
+  catalog_mysql_data:
+  order_mysql_data:
